@@ -49,6 +49,32 @@ export default {
     return data;
   },
 
+  removeFromCart: async (userId, serviceId) => {
+    // 1. Get user's cart
+    const { data: cart } = await supabase
+      .from('carts')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (!cart) {
+      throw new Error('Cart not found');
+    }
+
+    // 2. Remove the service from cart_items
+    const { error } = await supabase
+      .from('cart_items')
+      .delete()
+      .eq('cart_id', cart.id)
+      .eq('service_id', serviceId);
+
+    if (error) {
+      throw error;
+    }
+
+    return { message: 'Service removed from cart' };
+  },
+
   bookAppointment: async (user, payload) => {
     if (!isWithin7Days(payload.appointment_date)) {
       throw new Error('Booking allowed only for next 7 days');

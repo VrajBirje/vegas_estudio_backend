@@ -13,6 +13,11 @@ export default {
     res.json(await service.getCart(req.user.id));
   },
 
+  removeFromCart: async (req, res) => {
+    const { serviceId } = req.params;
+    res.json(await service.removeFromCart(req.user.id, serviceId));
+  },
+
   bookAppointment: async (req, res) => {
     res.json(await service.bookAppointment(req.user, req.body));
   },
