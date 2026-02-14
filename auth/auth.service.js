@@ -73,6 +73,7 @@ export default {
 
     return {
       token,
+      user: {id: 'admin', name: 'Admin', email , phone: "9999999999"},
       role: 'admin'
     };
   }
