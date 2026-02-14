@@ -131,43 +131,58 @@ export default {
   },
 
   updateAppointmentStatus: async (appointmentId, status, reason) => {
+    // 1. Validate status value
     if (!Object.values(APPOINTMENT_STATUS).includes(status)) {
       throw new Error('Invalid appointment status');
     }
 
-    // Fetch current status
-    const { data: appointment } = await supabase
+    // 2. Fetch current appointment
+    const { data: appointment, error } = await supabase
       .from('appointments')
       .select('status')
       .eq('id', appointmentId)
       .single();
 
-    if (!appointment) {
+    if (error || !appointment) {
       throw new Error('Appointment not found');
     }
 
     const currentStatus = appointment.status;
 
-    // Status transition validation
-    if (currentStatus === APPOINTMENT_STATUS.PENDING) {
-      if (
-        status !== APPOINTMENT_STATUS.CONFIRMED &&
-        status !== APPOINTMENT_STATUS.REJECTED
-      ) {
-        throw new Error('Invalid status transition');
-      }
+    // 3. Status transition rules
+    switch (currentStatus) {
+      case APPOINTMENT_STATUS.PENDING:
+        if (
+          status !== APPOINTMENT_STATUS.CONFIRMED &&
+          status !== APPOINTMENT_STATUS.REJECTED
+        ) {
+          throw new Error('Invalid status transition');
+        }
+        break;
+
+      case APPOINTMENT_STATUS.CONFIRMED:
+        if (
+          status !== APPOINTMENT_STATUS.CANCELLED &&
+          status !== APPOINTMENT_STATUS.COMPLETED
+        ) {
+          throw new Error('Invalid status transition');
+        }
+        break;
+
+      case APPOINTMENT_STATUS.COMPLETED:
+        throw new Error('Completed appointment cannot be updated');
+
+      case APPOINTMENT_STATUS.REJECTED:
+        throw new Error('Rejected appointment cannot be updated');
+
+      case APPOINTMENT_STATUS.CANCELLED:
+        throw new Error('Cancelled appointment cannot be updated');
+
+      default:
+        throw new Error('Invalid current appointment status');
     }
 
-    if (currentStatus === APPOINTMENT_STATUS.CONFIRMED) {
-      if (status !== APPOINTMENT_STATUS.CANCELLED) {
-        throw new Error('Invalid status transition');
-      }
-    }
-
-    if (currentStatus === APPOINTMENT_STATUS.REJECTED) {
-      throw new Error('Rejected appointment cannot be updated');
-    }
-
+    // 4. Rejection requires reason
     if (
       status === APPOINTMENT_STATUS.REJECTED &&
       (!reason || reason.trim() === '')
@@ -175,7 +190,8 @@ export default {
       throw new Error('Rejection reason is required');
     }
 
-    const { data } = await supabase
+    // 5. Update appointment
+    const { data: updatedAppointment, error: updateError } = await supabase
       .from('appointments')
       .update({
         status,
@@ -186,9 +202,14 @@ export default {
       .select()
       .single();
 
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
     return {
       message: 'Appointment status updated',
-      appointment: data
+      appointment: updatedAppointment
     };
   }
+
 };
