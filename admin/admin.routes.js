@@ -19,4 +19,7 @@ router.get('/block-slots', controller.getBlockedSlots);
 router.patch('/booking-toggle', controller.toggleBooking);
 router.patch('/appointments/:id/status', controller.updateAppointmentStatus);
 
+// endpoint to verify mail system
+router.post('/email/test', controller.testEmail);
+
 export default router;

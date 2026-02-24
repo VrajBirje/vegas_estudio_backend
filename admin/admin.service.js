@@ -206,10 +206,33 @@ export default {
       throw new Error(updateError.message);
     }
 
+    // send email to customer about status change
+    try {
+      const { sendAppointmentStatusEmail } = await import('../utils/email.js');
+      sendAppointmentStatusEmail({ appointment: updatedAppointment });
+    } catch (e) {
+      console.error('appointment status email error', e);
+    }
+
     return {
       message: 'Appointment status updated',
       appointment: updatedAppointment
     };
+  },
+
+  // helper for admin to verify mail system
+  testEmail: async (to) => {
+    if (!to) {
+      throw new Error('Recipient email required');
+    }
+
+    const { sendEmail } = await import('../utils/email.js');
+    await sendEmail({
+      to,
+      subject: 'Test message from Vegas system',
+      text: 'This is a test email to verify sending functionality.'
+    });
+    return { message: `Test email sent to ${to}` };
   }
 
 };

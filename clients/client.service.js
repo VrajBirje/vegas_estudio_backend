@@ -8,18 +8,69 @@ export default {
   },
 
   addToCart: async (userId, serviceId) => {
-    const { data: cart } = await supabase
+    // 1. Get or create cart
+    const { data: cart, error: cartError } = await supabase
       .from('carts')
       .select('id')
       .eq('user_id', userId)
       .single();
 
-    const cartId = cart?.id ||
-      (await supabase.from('carts').insert({ user_id: userId }).select().single()).data.id;
+    if (cartError && cartError.code !== 'PGRST116') {
+      throw cartError;
+    }
 
-    await supabase.from('cart_items').insert({ cart_id: cartId, service_id: serviceId });
-    return { message: 'Added to cart' };
+    let cartId = cart?.id;
+
+    if (!cartId) {
+      const { data: newCart, error } = await supabase
+        .from('carts')
+        .insert({ user_id: userId })
+        .select()
+        .single();
+
+      if (error) throw error;
+      cartId = newCart.id;
+    }
+
+    // 2. Check if service already exists in cart
+    const { data: existingItem } = await supabase
+      .from('cart_items')
+      .select('id')
+      .eq('cart_id', cartId)
+      .eq('service_id', serviceId)
+      .maybeSingle();
+
+    if (existingItem) {
+      return {
+        message: 'Service already in cart',
+        alreadyExists: true
+      };
+    }
+
+    // 3. Insert service into cart
+    const { error: insertError } = await supabase
+      .from('cart_items')
+      .insert({
+        cart_id: cartId,
+        service_id: serviceId
+      });
+
+    // 4. Handle unique constraint violation gracefully
+    if (insertError?.code === '23505') {
+      return {
+        message: 'Service already in cart',
+        alreadyExists: true
+      };
+    }
+
+    if (insertError) throw insertError;
+
+    return {
+      message: 'Added to cart',
+      added: true
+    };
   },
+
 
   getCart: async (userId) => {
     // 1. Get user's cart
@@ -144,11 +195,21 @@ export default {
       .delete()
       .eq('cart_id', cart.id);
 
+    // send confirmation to user and notification to admin
+    try {
+      const { sendBookingConfirmation, sendAdminNotification } = await import('../utils/email.js');
+      sendBookingConfirmation({ name: user.name, email: user.email, appointment });
+      sendAdminNotification({ appointment, user });
+    } catch (e) {
+      console.error('booking email error', e);
+    }
+
     return {
       message: 'Appointment booked successfully',
       appointment
     };
   },
+
 
   myAppointments: async (userId) => {
     const { data } = await supabase

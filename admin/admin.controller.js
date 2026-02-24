@@ -40,5 +40,11 @@ export default {
 
   updateAppointmentStatus: async (req, res) => {
     res.json(await service.updateAppointmentStatus(req.params.id, req.body.status, req.body.reason));
+  },
+
+  testEmail: async (req, res) => {
+    // expects { email } in body
+    const { email } = req.body;
+    res.json(await service.testEmail(email));
   }
 };
